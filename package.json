@@ -1,0 +1,56 @@
+{
+  "name": "rivium-ab-testing-nextjs",
+  "version": "0.1.0",
+  "description": "Rivium A/B Testing SDK for Next.js - Feature flags, experiments, and event tracking",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "require": "./dist/react.js",
+      "import": "./dist/react.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nextjs",
+    "react",
+    "ab-testing",
+    "rivium",
+    "experiments",
+    "feature-flags",
+    "a-b-testing"
+  ],
+  "author": "Rivium <founder@rivium.co>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rivium-co/rivium-ab-testing-nextjs-sdk.git"
+  },
+  "homepage": "https://github.com/Rivium-co/rivium-ab-testing-nextjs-sdk",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}

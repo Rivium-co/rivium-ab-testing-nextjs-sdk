@@ -1,0 +1,22 @@
+# Claude
+.claude/
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Next.js (example)
+example/.next/
+example/node_modules/
+
+# OS
+.DS_Store
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
