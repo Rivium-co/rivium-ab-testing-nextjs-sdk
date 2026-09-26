@@ -5,6 +5,11 @@ function isBrowser(): boolean {
 }
 
 export const Storage = {
+  /** The key as stored, prefix included (what getAllKeys returns). */
+  fullKey(key: string): string {
+    return `${STORAGE_PREFIX}${key}`;
+  },
+
   async getItem(key: string): Promise<string | null> {
     if (!isBrowser()) return null;
     try {

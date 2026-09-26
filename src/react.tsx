@@ -42,12 +42,6 @@ export function RiviumAbTestingProvider({
 
     async function initialize() {
       await RiviumAbTesting.init(config);
-      if (userId) {
-        await RiviumAbTesting.setUserId(userId);
-      }
-      if (userAttributes) {
-        await RiviumAbTesting.setUserAttributes(userAttributes);
-      }
       if (!cancelled) {
         setIsReady(true);
       }
@@ -64,8 +58,38 @@ export function RiviumAbTestingProvider({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Follows the signed-in user: a login or logout changes `userId`, and the
+  // SDK must drop the last user's variants and token when it does.
+  const [userReady, setUserReady] = useState<string | undefined>(undefined);
+  const attributesKey = JSON.stringify(userAttributes ?? {});
+
+  useEffect(() => {
+    if (!isReady) return;
+    let cancelled = false;
+
+    (async () => {
+      if (userId) {
+        await RiviumAbTesting.setUserId(userId);
+        if (userAttributes) {
+          await RiviumAbTesting.setUserAttributes(userAttributes);
+        }
+      }
+      if (!cancelled) setUserReady(userId ?? '');
+    })().catch((e) => {
+      if (config.debug) {
+        console.error('RiviumAbTesting: Failed to set user:', e);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady, userId, attributesKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ready = isReady && userReady === (userId ?? '');
+
   return (
-    <RiviumAbTestingContext.Provider value={isReady ? RiviumAbTesting : null}>
+    <RiviumAbTestingContext.Provider value={ready ? RiviumAbTesting : null}>
       {children}
     </RiviumAbTestingContext.Provider>
   );

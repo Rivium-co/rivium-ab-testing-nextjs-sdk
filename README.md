@@ -13,7 +13,8 @@ A/B Testing and Feature Flags SDK for Next.js / React with offline-first sync.
 - Offline-first event queue with automatic sync
 - 17 built-in event types (view, click, conversion, purchase, etc.)
 - React hooks and provider for easy integration
-- SSR-safe — works with Next.js server-side rendering
+- Browser SDK for Next.js — runs in client components; `init()` is ignored on the server, so no visitor's state is shared between requests (for server code use [`rivium-ab-testing-node`](https://www.npmjs.com/package/rivium-ab-testing-node))
+- Signed user tokens — the service takes the user from a token your server mints, not from the app
 - Dual CJS/ESM output with full TypeScript types
 
 ## Installation
@@ -37,9 +38,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <RiviumAbTestingProvider
       config={{
         apiKey: 'rv_live_your_api_key',
-        debug: true,
+        // Your server mints this for the signed-in user (see "User tokens").
+        tokenProvider: async () => (await (await fetch('/api/rivium-token', { method: 'POST' })).json()).token,
       }}
-      userId="user-123"
+      userId={session.user.id}
       userAttributes={{ plan: 'premium', country: 'US' }}
     >
       {children}
@@ -69,10 +71,10 @@ export default function Checkout() {
 ```typescript
 import { RiviumAbTesting } from 'rivium-ab-testing-nextjs';
 
-// 1. Initialize
+// 1. Initialize (in the browser)
 await RiviumAbTesting.init({
   apiKey: 'rv_live_your_api_key',
-  debug: true,
+  tokenProvider: fetchRiviumToken, // see "User tokens"
 });
 
 // 2. Set user
@@ -88,6 +90,38 @@ await RiviumAbTesting.trackConversion('checkout-redesign', 49.99);
 await RiviumAbTesting.flush();
 ```
 
+## User tokens
+
+Anyone can read the API key out of your site, so on its own it can't prove
+which user a request is for. Your server can: it holds your project's **server
+secret** and mints a short-lived token for the signed-in user. The SDK sends
+it, and the service takes the user from the token.
+
+```typescript
+// app/api/rivium-token/route.ts  (server)
+import { RiviumAbTesting } from 'rivium-ab-testing-node';
+
+await RiviumAbTesting.init({ apiKey: process.env.RIVIUM_API_KEY!, serverSecret: process.env.RIVIUM_SERVER_SECRET });
+
+export async function POST() {
+  const session = await getSession();           // your auth
+  if (!session) return new Response(null, { status: 401 });
+  return Response.json(await RiviumAbTesting.createUserToken(session.user.id));
+}
+```
+
+Give the SDK a `tokenProvider` that calls it. The SDK asks again shortly
+before the token expires, and once more if the service says it has expired.
+When a user signs out or another signs in, change `userId` on the provider (or
+call `setUserId`): the last user's variants and token are dropped.
+
+A token is **required**: assigning variants, tracking events and evaluating
+flags are refused without one (reading the experiment and flag lists is not, so
+the page can load them before anyone signs in). The same token works for Rivium
+Chat and Sync: mint one and pass it to every Rivium SDK.
+
+**Never put the server secret in client code or a `NEXT_PUBLIC_` variable.**
+
 ## React Hooks
 
 ### RiviumAbTestingProvider
@@ -98,11 +132,10 @@ Wrap your app with the provider to initialize the SDK:
 <RiviumAbTestingProvider
   config={{
     apiKey: 'rv_live_your_api_key',
-    debug: true,
+    tokenProvider: fetchRiviumToken,
     flushInterval: 30000,
-    maxQueueSize: 100,
   }}
-  userId="user-123"
+  userId={session.user.id}   // changes on login/logout are followed
   userAttributes={{ plan: 'premium' }}
 >
   {children}
@@ -274,9 +307,10 @@ unsubscribe();
 ```typescript
 await RiviumAbTesting.init({
   apiKey: 'rv_live_your_api_key',
-  debug: true,            // Enable debug logging
-  flushInterval: 30000,   // Auto-flush interval in ms (default: 30000)
-  maxQueueSize: 100,      // Max events before auto-flush (default: 100)
+  tokenProvider: fetchRiviumToken, // returns a user token minted by your server
+  debug: false,           // log to the console (development only)
+  flushInterval: 30000,   // send queued events every N ms (default: 30000)
+  maxQueueSize: 1000,     // events kept while offline (default: 1000)
 });
 ```
 
