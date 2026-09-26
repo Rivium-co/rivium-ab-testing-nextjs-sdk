@@ -73,6 +73,9 @@ export function RiviumAbTestingProvider({
         if (userAttributes) {
           await RiviumAbTesting.setUserAttributes(userAttributes);
         }
+      } else if (await RiviumAbTesting.getUserId()) {
+        // Signed out: the last user's variants and token must not stay behind.
+        await RiviumAbTesting.clearUserId();
       }
       if (!cancelled) setUserReady(userId ?? '');
     })().catch((e) => {

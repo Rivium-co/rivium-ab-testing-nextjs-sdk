@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- New `clearUserId()`; the provider calls it when `userId` is cleared, so a signed-out user's data no longer stays in the browser.
+
 ## 0.2.0
 
 - Signed user tokens: new `tokenProvider` option. Your server mints a Rivium user token and the SDK sends it with every request. Required for assigning variants, tracking and flag evaluation.

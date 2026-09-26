@@ -2,7 +2,7 @@ import { Storage } from './storage';
 import { createHash } from './hash';
 
 const API_URL = 'https://abtest.rivium.co';
-const SDK_VERSION = '0.2.0';
+const SDK_VERSION = '0.2.1';
 /** Fetch a new user token this many seconds before the current one expires. */
 const TOKEN_REFRESH_SKEW_S = 60;
 
@@ -267,6 +267,23 @@ class RiviumAbTestingSDK {
     }
     this.userId = userId;
     await Storage.setItem('user_id', userId);
+  }
+
+  /**
+   * Signs the user out of the SDK: sends their pending events under their
+   * own token, then drops their variants, attributes, token and stored id.
+   * Call it on logout so the next visitor on this browser starts clean.
+   */
+  async clearUserId(): Promise<void> {
+    this.ensureInitialized();
+    if (this.userId && this.eventQueue.length > 0) {
+      await this.syncEvents().catch(() => {});
+    }
+    await this.clearAssignments();
+    this.userAttributes = {};
+    this.clearUserToken();
+    this.userId = null;
+    await Storage.removeItem('user_id');
   }
 
   async getUserId(): Promise<string | null> {

@@ -112,8 +112,10 @@ export async function POST() {
 
 Give the SDK a `tokenProvider` that calls it. The SDK asks again shortly
 before the token expires, and once more if the service says it has expired.
-When a user signs out or another signs in, change `userId` on the provider (or
-call `setUserId`): the last user's variants and token are dropped.
+When a user signs out, clear `userId` on the provider (or call
+`clearUserId()`); when another signs in, pass their id (or call `setUserId`).
+Either way the last user's pending events are sent, then their variants and
+token are dropped.
 
 A token is **required**: assigning variants, tracking events and evaluating
 flags are refused without one (reading the experiment and flag lists is not, so
@@ -333,6 +335,7 @@ await RiviumAbTesting.reset();
 |---|---|
 | `init(config)` | Initialize the SDK |
 | `setUserId(id)` | Set user ID for assignment |
+| `clearUserId()` | Sign the user out: send their events, drop their data |
 | `getUserId()` | Get current user ID |
 | `setUserAttributes(attrs)` | Set targeting attributes |
 | `getVariant(key)` | Get assigned variant |
