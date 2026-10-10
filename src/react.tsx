@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -17,6 +18,10 @@ import {
 // ============================================
 
 const RiviumAbTestingContext = createContext<typeof RiviumAbTesting | null>(null);
+
+// Goes up when the signed-in user or their token changes, so the hooks read
+// their values again.
+const RiviumAbTestingUserContext = createContext(0);
 
 // ============================================
 // PROVIDER
@@ -58,10 +63,40 @@ export function RiviumAbTestingProvider({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A user token arriving (sign-in) or going away (sign-out) changes what the
+  // hooks should show: the real values, or the defaults while the SDK waits.
+  const [userVersion, setUserVersion] = useState(0);
+
+  useEffect(() => {
+    if (!isReady) return;
+    const bump = () => setUserVersion((v) => v + 1);
+    const offReady = RiviumAbTesting.on('userTokenReady', bump);
+    const offAwaiting = RiviumAbTesting.on('awaitingUserToken', bump);
+    return () => {
+      offReady();
+      offAwaiting();
+    };
+  }, [isReady]);
+
+  // Follows `config.userToken` when the app renders with a new one.
+  const lastUserToken = useRef(config.userToken);
+
+  useEffect(() => {
+    if (!isReady || lastUserToken.current === config.userToken) return;
+    lastUserToken.current = config.userToken;
+    RiviumAbTesting.setUserToken(config.userToken ?? null).catch((e) => {
+      if (config.debug) {
+        console.error('RiviumAbTesting: Failed to set user token:', e);
+      }
+    });
+  }, [isReady, config.userToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Follows the signed-in user: a login or logout changes `userId`, and the
   // SDK must drop the last user's variants and token when it does.
   const [userReady, setUserReady] = useState<string | undefined>(undefined);
   const attributesKey = JSON.stringify(userAttributes ?? {});
+  const hadUserId = useRef(false);
+  const usesUserToken = !!(config.tokenProvider || config.userToken);
 
   useEffect(() => {
     if (!isReady) return;
@@ -69,13 +104,21 @@ export function RiviumAbTestingProvider({
 
     (async () => {
       if (userId) {
+        hadUserId.current = true;
         await RiviumAbTesting.setUserId(userId);
         if (userAttributes) {
           await RiviumAbTesting.setUserAttributes(userAttributes);
         }
-      } else if (await RiviumAbTesting.getUserId()) {
+      } else if (hadUserId.current || !usesUserToken) {
         // Signed out: the last user's variants and token must not stay behind.
-        await RiviumAbTesting.clearUserId();
+        // (Without a `userId` prop from the start, the user token says who
+        // the user is and the SDK follows it by itself.)
+        hadUserId.current = false;
+        if (await RiviumAbTesting.getUserId()) {
+          await RiviumAbTesting.clearUserId();
+        }
+      } else if (userAttributes) {
+        await RiviumAbTesting.setUserAttributes(userAttributes);
       }
       if (!cancelled) setUserReady(userId ?? '');
     })().catch((e) => {
@@ -93,7 +136,9 @@ export function RiviumAbTestingProvider({
 
   return (
     <RiviumAbTestingContext.Provider value={ready ? RiviumAbTesting : null}>
-      {children}
+      <RiviumAbTestingUserContext.Provider value={userVersion}>
+        {children}
+      </RiviumAbTestingUserContext.Provider>
     </RiviumAbTestingContext.Provider>
   );
 }
@@ -119,6 +164,7 @@ export function useVariant(
   const [variant, setVariant] = useState(defaultVariant);
   const [isLoading, setIsLoading] = useState(true);
   const sdk = useContext(RiviumAbTestingContext);
+  const userVersion = useContext(RiviumAbTestingUserContext);
 
   useEffect(() => {
     if (!sdk) return;
@@ -143,7 +189,7 @@ export function useVariant(
     return () => {
       cancelled = true;
     };
-  }, [sdk, experimentKey, defaultVariant]);
+  }, [sdk, userVersion, experimentKey, defaultVariant]);
 
   return { variant, isLoading };
 }
@@ -155,6 +201,7 @@ export function useFeatureFlag(
   const [enabled, setEnabled] = useState(defaultValue);
   const [isLoading, setIsLoading] = useState(true);
   const sdk = useContext(RiviumAbTestingContext);
+  const userVersion = useContext(RiviumAbTestingUserContext);
 
   useEffect(() => {
     if (!sdk) return;
@@ -179,7 +226,7 @@ export function useFeatureFlag(
     return () => {
       cancelled = true;
     };
-  }, [sdk, flagKey, defaultValue]);
+  }, [sdk, userVersion, flagKey, defaultValue]);
 
   return { enabled, isLoading };
 }
@@ -191,6 +238,7 @@ export function useFeatureValue(
   const [value, setValue] = useState<unknown>(defaultValue);
   const [isLoading, setIsLoading] = useState(true);
   const sdk = useContext(RiviumAbTestingContext);
+  const userVersion = useContext(RiviumAbTestingUserContext);
 
   useEffect(() => {
     if (!sdk) return;
@@ -215,7 +263,7 @@ export function useFeatureValue(
     return () => {
       cancelled = true;
     };
-  }, [sdk, flagKey, defaultValue]);
+  }, [sdk, userVersion, flagKey, defaultValue]);
 
   return { value, isLoading };
 }
