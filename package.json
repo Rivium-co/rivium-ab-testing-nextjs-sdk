@@ -1,6 +1,6 @@
 {
   "name": "rivium-ab-testing-nextjs",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Rivium A/B Testing SDK for Next.js - Feature flags, experiments, and event tracking",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
